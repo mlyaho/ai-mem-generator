@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import ImageUpload from "@/components/ImageUpload";
 import AIPrompt from "@/components/AIPrompt";
 import MemePreview from "@/components/MemePreview";
@@ -22,7 +22,7 @@ interface Meme {
 }
 
 export default function Home() {
-  const { data: session } = useSession();
+  const { session, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [image, setImage] = useState<string | null>(null);
@@ -49,15 +49,15 @@ export default function Home() {
     localStorage.setItem("meme-gallery", JSON.stringify(memes));
   }, [memes]);
 
-  const handleImageSelect = (file: File, preview: string) => {
+  const handleImageSelect = useCallback((file: File, preview: string) => {
     setImage(preview);
     setGeneratedImage(null);
     setImageError(null);
     setTopText("");
     setBottomText("");
-  };
+  }, []);
 
-  const handleGenerate = async (prompt: string) => {
+  const handleGenerate = useCallback(async (prompt: string) => {
     setIsLoading(true);
     setImageError(null);
 
@@ -77,14 +77,14 @@ export default function Home() {
     }
 
     setIsLoading(false);
-  };
+  }, []);
 
-  const handleTextChange = (top: string, bottom: string) => {
+  const handleTextChange = useCallback((top: string, bottom: string) => {
     setTopText(top);
     setBottomText(bottom);
-  };
+  }, []);
 
-  const handleSaveMeme = async () => {
+  const handleSaveMeme = useCallback(async () => {
     if (!image) return;
 
     if (!session) {
@@ -124,17 +124,28 @@ export default function Home() {
       console.error("Save meme error:", error);
       alert("Не удалось сохранить мем");
     }
-  };
+  }, [image, topText, bottomText, isPublic, session, router]);
 
-  const handleSelectMeme = (meme: Meme) => {
+  const handleSelectMeme = useCallback((meme: Meme) => {
     setImage(meme.imageSrc);
     setTopText(meme.topText);
     setBottomText(meme.bottomText);
-  };
+  }, []);
 
-  const handleDeleteMeme = (id: string) => {
+  const handleDeleteMeme = useCallback((id: string) => {
     setMemes((prev) => prev.filter((m) => m.id !== id));
-  };
+  }, []);
+
+  // Показываем загрузку пока сессия не загрузится
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50
+                      dark:from-zinc-950 dark:via-zinc-900 dark:to-purple-950
+                      flex items-center justify-center">
+        <div className="text-zinc-600 dark:text-zinc-400">Загрузка...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50

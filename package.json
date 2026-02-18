@@ -6,12 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
+    "effector": "^23.4.4",
+    "effector-react": "^23.3.0",
     "express-rate-limit": "^8.2.1",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
@@ -20,7 +24,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/postcss": "^4.2.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -29,7 +34,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "prisma": "^5.22.0",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.2.0",
     "typescript": "^5"
   }
 }

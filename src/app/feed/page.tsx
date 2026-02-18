@@ -1,8 +1,7 @@
 "use client";
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 
 interface Meme {
@@ -20,17 +19,13 @@ interface Meme {
 }
 
 export default function Feed() {
-  const { data: session } = useSession();
+  const { session } = useAuth();
   const [memes, setMemes] = useState<Meme[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  useEffect(() => {
-    loadMemes();
-  }, []);
-
-  const loadMemes = async (cursor?: string | null) => {
+  const loadMemes = useCallback(async (cursor?: string | null) => {
     try {
       let url = "/api/memes?isPublic=true";
       if (cursor) url += `&cursor=${cursor}`;
@@ -50,14 +45,18 @@ export default function Feed() {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  };
+  }, []);
 
-  const handleLoadMore = () => {
+  useEffect(() => {
+    loadMemes();
+  }, [loadMemes]);
+
+  const handleLoadMore = useCallback(() => {
     if (nextCursor && !isLoadingMore) {
       setIsLoadingMore(true);
       loadMemes(nextCursor);
     }
-  };
+  }, [nextCursor, isLoadingMore, loadMemes]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50
@@ -73,7 +72,7 @@ export default function Feed() {
             🎭 AI Meme Generator
           </Link>
           <div className="flex items-center gap-4">
-            {session?.user ? (
+            {session ? (
               <>
                 <Link
                   href="/profile"
@@ -83,7 +82,7 @@ export default function Feed() {
                 >
                   👤 Профиль
                 </Link>
-                {session.user.image && (
+                {session?.user?.image && (
                   <img
                     src={session.user.image}
                     alt={session.user.name || "User"}

@@ -1,9 +1,10 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Meme {
   id: string;
@@ -15,25 +16,20 @@ interface Meme {
 }
 
 export default function Profile() {
-  const { data: session, status } = useSession();
+  const { isAuthenticated, isLoading: authLoading, session } = useAuth();
   const router = useRouter();
   const [memes, setMemes] = useState<Meme[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPublicFilter, setIsPublicFilter] = useState<"all" | "public" | "private">("all");
 
+  // Редирект если не авторизован
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (!authLoading && !isAuthenticated) {
       router.push("/auth/signin");
     }
-  }, [status, router]);
+  }, [isAuthenticated, authLoading, router]);
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      loadMemes();
-    }
-  }, [session, isPublicFilter]);
-
-  const loadMemes = async () => {
+  const loadMemes = useCallback(async () => {
     if (!session?.user?.id) return;
 
     setIsLoading(true);
@@ -50,7 +46,13 @@ export default function Profile() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id, isPublicFilter]);
+
+  useEffect(() => {
+    if (isAuthenticated && session?.user?.id) {
+      loadMemes();
+    }
+  }, [isAuthenticated, loadMemes, session?.user?.id]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Удалить этот мем?")) return;
@@ -83,7 +85,7 @@ export default function Profile() {
     }
   };
 
-  if (status === "loading" || status === "unauthenticated") {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50
                       dark:from-zinc-950 dark:via-zinc-900 dark:to-purple-950
@@ -220,11 +222,10 @@ export default function Profile() {
 
                   <div className="absolute top-2 left-2">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        meme.isPublic
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${meme.isPublic
                           ? "bg-green-500 text-white"
                           : "bg-zinc-700 text-white"
-                      }`}
+                        }`}
                     >
                       {meme.isPublic ? "🌍 Публичный" : "🔒 Приватный"}
                     </span>
