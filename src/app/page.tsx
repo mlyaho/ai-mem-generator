@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import ImageUpload from "@/components/ImageUpload";
 import AIPrompt from "@/components/AIPrompt";
 import MemePreview from "@/components/MemePreview";
 import MemeGallery from "@/components/MemeGallery";
 import { apiFactory, pollinationsService } from "@/services";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // Инициализация сервисов
 apiFactory.register("pollinations", pollinationsService);
@@ -19,6 +22,9 @@ interface Meme {
 }
 
 export default function Home() {
+  const { data: session } = useSession();
+  const router = useRouter();
+
   const [image, setImage] = useState<string | null>(null);
   const [topText, setTopText] = useState("");
   const [bottomText, setBottomText] = useState("");
@@ -26,6 +32,7 @@ export default function Home() {
   const [memes, setMemes] = useState<Meme[]>([]);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(true);
 
   useEffect(() => {
     const saved = localStorage.getItem("meme-gallery");
@@ -77,18 +84,46 @@ export default function Home() {
     setBottomText(bottom);
   };
 
-  const handleSaveMeme = () => {
+  const handleSaveMeme = async () => {
     if (!image) return;
 
-    const newMeme: Meme = {
-      id: Date.now().toString(),
-      imageSrc: image,
-      topText,
-      bottomText,
-      createdAt: Date.now(),
-    };
+    if (!session) {
+      // Если не авторизован - сохраняем локально
+      const newMeme: Meme = {
+        id: Date.now().toString(),
+        imageSrc: image,
+        topText,
+        bottomText,
+        createdAt: Date.now(),
+      };
+      setMemes((prev) => [newMeme, ...prev]);
+      return;
+    }
 
-    setMemes((prev) => [newMeme, ...prev]);
+    // Если авторизован - сохраняем в БД
+    try {
+      const res = await fetch("/api/memes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: image,
+          topText,
+          bottomText,
+          isPublic,
+        }),
+      });
+
+      if (res.ok) {
+        alert("Мем сохранен в вашу галерею!");
+        router.push("/profile");
+      } else {
+        const data = await res.json();
+        alert("Ошибка: " + data.error);
+      }
+    } catch (error) {
+      console.error("Save meme error:", error);
+      alert("Не удалось сохранить мем");
+    }
   };
 
   const handleSelectMeme = (meme: Meme) => {
@@ -102,18 +137,49 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50
                     dark:from-zinc-950 dark:via-zinc-900 dark:to-purple-950">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
-        <header className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-purple-600 to-pink-600 
-                         bg-clip-text text-transparent mb-2">
-            🎭 AI Meme Generator
-          </h1>
-          <p className="text-zinc-600 dark:text-zinc-400">
-            Загрузи фото → AI придумает текст → Стань легендой
-          </p>
+        <header className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600
+                           bg-clip-text text-transparent mb-2">
+              🎭 AI Meme Generator
+            </h1>
+            <p className="text-zinc-600 dark:text-zinc-400">
+              Загрузи фото → AI придумает текст → Стань легендой
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/feed"
+              className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700
+                       rounded-xl font-medium text-zinc-700 dark:text-zinc-300
+                       hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all"
+            >
+              🌍 Лента
+            </Link>
+            {session ? (
+              <Link
+                href="/profile"
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600
+                         text-white font-medium rounded-xl
+                         hover:from-purple-700 hover:to-pink-700 transition-all"
+              >
+                👤 Профиль
+              </Link>
+            ) : (
+              <Link
+                href="/auth/signin"
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600
+                         text-white font-medium rounded-xl
+                         hover:from-purple-700 hover:to-pink-700 transition-all"
+              >
+                Войти
+              </Link>
+            )}
+          </div>
         </header>
 
         <div className="space-y-8">
@@ -141,20 +207,45 @@ export default function Home() {
                 onImageError={() => setImageError("Изображение не загрузилось")}
               />
 
+              {/* Privacy Toggle (только для авторизованных) */}
+              {session && (
+                <div className="flex items-center gap-3 p-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isPublic}
+                      onChange={(e) => setIsPublic(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4
+                                  peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800
+                                  rounded-full peer dark:bg-zinc-700
+                                  peer-checked:after:translate-x-full peer-checked:after:border-white
+                                  after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                  after:bg-white after:border-zinc-300 after:border after:rounded-full
+                                  after:h-5 after:w-5 after:transition-all dark:border-zinc-600
+                                  peer-checked:bg-purple-600"></div>
+                    <span className="ml-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {isPublic ? "🌍 Публичный (видно всем)" : "🔒 Приватный (только мне)"}
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="flex gap-4">
                 <button
                   onClick={handleSaveMeme}
-                  className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-pink-600 
+                  className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-pink-600
                            text-white font-semibold rounded-2xl text-lg
                            hover:from-purple-700 hover:to-pink-700
                            transition-all duration-300 shadow-lg hover:shadow-xl"
                 >
-                  💾 Сохранить в галерею
+                  💾 {session ? "Сохранить в галерею" : "Сохранить локально"}
                 </button>
                 <button
                   onClick={() => setImage(null)}
-                  className="px-8 py-4 bg-zinc-200 dark:bg-zinc-800 
+                  className="px-8 py-4 bg-zinc-200 dark:bg-zinc-800
                            text-zinc-700 dark:text-zinc-300 font-semibold rounded-2xl
                            hover:bg-zinc-300 dark:hover:bg-zinc-700
                            transition-all duration-300"
@@ -162,6 +253,12 @@ export default function Home() {
                   🔄 Новое фото
                 </button>
               </div>
+
+              {!session && (
+                <div className="p-4 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-xl text-yellow-800 dark:text-yellow-300 text-sm">
+                  💡 <strong>Совет:</strong> <Link href="/auth/signup" className="underline font-medium">Зарегистрируйтесь</Link>, чтобы сохранять мемы в облаке и делиться ими с другими!
+                </div>
+              )}
             </div>
           )}
 
