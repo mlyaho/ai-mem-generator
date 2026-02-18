@@ -1,36 +1,184 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎭 AI Meme Generator
 
-## Getting Started
+Генератор мемов с искусственным интеллектом. Загрузи фото → AI придумает текст → Стань легендой!
 
-First, run the development server:
+## ✨ Возможности
+
+- 🤖 **AI-генерация** — автоматическая генерация текста для мемов через Pollinations API
+- 🔐 **Авторизация** — регистрация через email/пароль, Google, GitHub
+- 📸 **Личная галерея** — сохранение созданных мемов в личном кабинете
+- 🌍 **Публичная лента** — просмотр мемов всех пользователей
+- 🔒 **Контроль видимости** — выбор между публичным и приватным доступом
+- 📱 **Адаптивный дизайн** — работает на десктопе и мобильных устройствах
+
+## 🚀 Быстрый старт
+
+### Требования
+
+- Node.js 18+ 
+- npm или yarn
+
+### Установка
 
 ```bash
+# Клонирование репозитория
+git clone https://github.com/mlyaho/ai-mem-generator.git
+cd ai-mem-generator
+
+# Установка зависимостей
+npm install
+
+# Запуск разработки
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Откройте [http://localhost:3000](http://localhost:3000) в браузере.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Структура проекта
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── auth/          # NextAuth API (signin, register)
+│   │   └── memes/         # API мемов (CRUD, visibility)
+│   ├── auth/
+│   │   ├── signin/        # Страница входа
+│   │   └── signup/        # Страница регистрации
+│   ├── feed/              # Лента публичных мемов
+│   ├── profile/           # Личный кабинет пользователя
+│   ├── layout.tsx         # Основной layout
+│   └── page.tsx           # Главная (генератор мемов)
+├── components/
+│   ├── AIPrompt.tsx       # Форма ввода промпта
+│   ├── ImageUpload.tsx    # Загрузка изображения
+│   ├── MemeGallery.tsx    # Галерея мемов
+│   ├── MemePreview.tsx    # Предпросмотр мема
+│   └── Providers.tsx      # SessionProvider
+├── lib/
+│   └── prisma.ts          # Prisma клиент
+└── services/
+    ├── ApiFactory.ts      # Фабрика API сервисов
+    ├── PollinationsService.ts
+    ├── YandexGPTService.ts
+    ├── KandinskyService.ts
+    └── GigaChatService.ts
+```
 
-## Learn More
+## 🛠 Стек технологий
 
-To learn more about Next.js, take a look at the following resources:
+| Категория | Технологии |
+|-----------|------------|
+| Framework | Next.js 16 (App Router) |
+| Язык | TypeScript |
+| Стили | Tailwind CSS v4 |
+| База данных | SQLite (dev) / PostgreSQL (prod) |
+| ORM | Prisma 5 |
+| Авторизация | NextAuth.js v5 (Auth.js) |
+| AI API | Pollinations, YandexGPT, Kandinsky, GigaChat |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔐 Настройка OAuth (опционально)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Для входа через Google/GitHub добавьте переменные в `.env`:
 
-## Deploy on Vercel
+### Google OAuth
+1. Откройте [Google Cloud Console](https://console.cloud.google.com/)
+2. Создайте проект → Credentials → OAuth 2.0 Client ID
+3. Redirect URI: `http://localhost:3000/api/auth/callback/google`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```env
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### GitHub OAuth
+1. Откройте [GitHub Settings → Developer settings](https://github.com/settings/developers)
+2. OAuth Apps → New OAuth App
+3. Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
+
+```env
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-client-secret
+```
+
+## 📊 Схема базы данных
+
+```prisma
+User {
+  id, email, passwordHash, name, image, createdAt
+  memes[]
+}
+
+Meme {
+  id, userId, imageUrl, topText, bottomText, 
+  isPublic (default: true), createdAt
+  user → User
+}
+```
+
+## 🌐 API Endpoints
+
+### Авторизация
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| POST | `/api/auth/register` | Регистрация нового пользователя |
+| GET/POST | `/api/auth/[...nextauth]` | NextAuth handler |
+
+### Мемы
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | `/api/memes` | Получение мемов (с фильтрами userId, isPublic, cursor) |
+| POST | `/api/memes` | Создание мема (требуется авторизация) |
+| DELETE | `/api/memes?id=...` | Удаление мема (только владелец) |
+| PATCH | `/api/memes/[id]/visibility` | Изменение видимости |
+
+## 📝 Использование
+
+### Регистрация
+1. Перейдите на `/auth/signup`
+2. Введите email и пароль (мин. 6 символов)
+3. После регистрации вы будете автоматически авторизованы
+
+### Создание мема
+1. На главной странице загрузите изображение или сгенерируйте через AI
+2. Введите промпт для генерации текста
+3. Выберите видимость (🌍 Публичный / 🔒 Приватный)
+4. Нажмите "Сохранить в галерею"
+
+### Личный кабинет
+- `/profile` — просмотр ваших мемов
+- Фильтрация: Все / Публичные / Приватные
+- Изменение видимости и удаление мемов
+
+### Лента мемов
+- `/feed` — публичные мемы всех пользователей
+- Пагинация через кнопку "Загрузить ещё"
+
+## 🚀 Продакшн
+
+### Переключение на PostgreSQL
+
+1. Установите PostgreSQL и создайте базу данных
+2. Обновите `.env`:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/meme_db"
+NEXTAUTH_URL="https://your-domain.com"
+NEXTAUTH_SECRET="your-production-secret"
+```
+3. Примените миграции:
+```bash
+npx prisma migrate deploy
+```
+
+### Генерация нового секрета
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+## 📝 Лицензия
+
+MIT
+
+## 👥 Авторы
+
+- [@mlyaho](https://github.com/mlyaho)
