@@ -1,17 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { registerSchema } from "@/lib/validators";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
-  try {
-    const { email, password, name } = await req.json();
+  // Rate limiting для защиты от brute-force
+  const rateLimitResponse = rateLimit(req, "auth");
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
 
-    if (!email || !password) {
+  try {
+    const body = await req.json();
+    
+    // Валидация входных данных
+    const validation = registerSchema.safeParse(body);
+    
+    if (!validation.success) {
+      const errors = validation.error.issues.map(e => e.message).join("; ");
       return NextResponse.json(
-        { error: "Email и пароль обязательны" },
+        { error: errors },
         { status: 400 }
       );
     }
+
+    const { email, password, name } = validation.data;
 
     const existingUser = await prisma.user.findUnique({
       where: { email },

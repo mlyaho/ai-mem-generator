@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { memeSchema } from "@/lib/validators";
+import { rateLimit } from "@/lib/rateLimit";
 
 // GET - получение мемов
 export async function GET(req: NextRequest) {
@@ -12,17 +14,14 @@ export async function GET(req: NextRequest) {
 
     let where: any = {};
 
-    // Если указан userId - получаем мемы конкретного пользователя
     if (userId) {
       where.userId = userId;
     }
 
-    // Фильтр по публичности
     if (isPublic !== null) {
       where.isPublic = isPublic === "true";
     }
 
-    // Пагинация
     const take = 20;
     const skip = cursor ? 1 : 0;
 
@@ -60,6 +59,12 @@ export async function GET(req: NextRequest) {
 
 // POST - создание мема
 export async function POST(req: NextRequest) {
+  // Rate limiting
+  const rateLimitResponse = rateLimit(req, "api");
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   try {
     const session = await auth();
 
@@ -70,14 +75,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { imageUrl, topText, bottomText, isPublic } = await req.json();
-
-    if (!imageUrl) {
+    const body = await req.json();
+    
+    // Валидация данных
+    const validation = memeSchema.safeParse(body);
+    
+    if (!validation.success) {
+      const errors = validation.error.issues.map(e => e.message).join("; ");
       return NextResponse.json(
-        { error: "Изображение обязательно" },
+        { error: errors },
         { status: 400 }
       );
     }
+
+    const { imageUrl, topText, bottomText, isPublic } = validation.data;
 
     const meme = await prisma.meme.create({
       data: {
@@ -85,7 +96,7 @@ export async function POST(req: NextRequest) {
         imageUrl,
         topText: topText || "",
         bottomText: bottomText || "",
-        isPublic: isPublic !== false, // по умолчанию true
+        isPublic,
       },
       include: {
         user: {
@@ -110,6 +121,12 @@ export async function POST(req: NextRequest) {
 
 // DELETE - удаление мема
 export async function DELETE(req: NextRequest) {
+  // Rate limiting
+  const rateLimitResponse = rateLimit(req, "api");
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   try {
     const session = await auth();
 

@@ -5,6 +5,11 @@ import GitHubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { rateLimit } from "@/lib/rateLimit";
+import { NextRequest } from "next/server";
+
+// Хранение неудачных попыток входа в памяти (для production лучше использовать БД/Redis)
+const failedLoginAttempts = new Map<string, { count: number; resetTime: number }>();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
@@ -24,27 +29,59 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
         name: { label: "Name", type: "text" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Email и пароль обязательны");
         }
 
         const email = credentials.email as string;
         const password = credentials.password as string;
+        const ip = (req as NextRequest)?.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
+        const now = Date.now();
+        const lockoutTime = 15 * 60 * 1000; // 15 минут
+        const maxAttempts = 5;
+
+        // Проверка блокировки
+        const attempt = failedLoginAttempts.get(email.toLowerCase());
+        if (attempt && now < attempt.resetTime) {
+          if (attempt.count >= maxAttempts) {
+            const remainingTime = Math.ceil((attempt.resetTime - now) / 60000);
+            throw new Error(
+              `Слишком много неудачных попыток. Попробуйте через ${remainingTime} мин.`
+            );
+          }
+        }
 
         const user = await prisma.user.findUnique({
-          where: { email },
+          where: { email: email.toLowerCase() },
         });
 
         if (!user || !user.passwordHash) {
+          // Запись неудачной попытки
+          if (!attempt || now > attempt.resetTime) {
+            failedLoginAttempts.set(email.toLowerCase(), { count: 1, resetTime: now + lockoutTime });
+          } else {
+            attempt.count++;
+            failedLoginAttempts.set(email.toLowerCase(), attempt);
+          }
           throw new Error("Неверный email или пароль");
         }
 
         const isMatch = await bcrypt.compare(password, user.passwordHash);
 
         if (!isMatch) {
+          // Запись неудачной попытки
+          if (!attempt || now > attempt.resetTime) {
+            failedLoginAttempts.set(email.toLowerCase(), { count: 1, resetTime: now + lockoutTime });
+          } else {
+            attempt.count++;
+            failedLoginAttempts.set(email.toLowerCase(), attempt);
+          }
           throw new Error("Неверный email или пароль");
         }
+
+        // Очистка при успешном входе
+        failedLoginAttempts.delete(email.toLowerCase());
 
         return {
           id: user.id,
@@ -57,6 +94,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 дней
+  },
+  pages: {
+    signIn: "/auth/signin",
+  },
+  // Настройки безопасности
+  secret: process.env.NEXTAUTH_SECRET,
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60,
+  },
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
@@ -75,9 +132,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  pages: {
-    signIn: "/auth/signin",
-  },
+  trustHost: true,
 });
 
 export const GET = handlers.GET;
