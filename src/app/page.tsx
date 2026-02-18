@@ -1,65 +1,177 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import ImageUpload from "@/components/ImageUpload";
+import AIPrompt from "@/components/AIPrompt";
+import MemePreview from "@/components/MemePreview";
+import MemeGallery from "@/components/MemeGallery";
+import { pollinationsService } from "@/services";
+
+interface Meme {
+  id: string;
+  imageSrc: string;
+  topText: string;
+  bottomText: string;
+  createdAt: number;
+}
 
 export default function Home() {
+  const [image, setImage] = useState<string | null>(null);
+  const [topText, setTopText] = useState("");
+  const [bottomText, setBottomText] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [memes, setMemes] = useState<Meme[]>([]);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("meme-gallery");
+    if (saved) {
+      try {
+        setMemes(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load memes");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("meme-gallery", JSON.stringify(memes));
+  }, [memes]);
+
+  const handleImageSelect = (file: File, preview: string) => {
+    setImage(preview);
+    setGeneratedImage(null);
+    setImageError(null);
+    setTopText("");
+    setBottomText("");
+  };
+
+  const handleGenerate = async (prompt: string) => {
+    setIsLoading(true);
+    setImageError(null);
+    
+    try {
+      const result = await pollinationsService.generateMeme(prompt);
+      
+      setImage(result.imageUrl);
+      setGeneratedImage(result.imageUrl);
+      setTopText(result.topText);
+      setBottomText(result.bottomText);
+    } catch (error) {
+      console.error("AI generation error:", error);
+      setImageError("Не удалось сгенерировать изображение");
+    }
+    
+    setIsLoading(false);
+  };
+
+  const handleTextChange = (top: string, bottom: string) => {
+    setTopText(top);
+    setBottomText(bottom);
+  };
+
+  const handleSaveMeme = () => {
+    if (!image) return;
+    
+    const newMeme: Meme = {
+      id: Date.now().toString(),
+      imageSrc: image,
+      topText,
+      bottomText,
+      createdAt: Date.now(),
+    };
+    
+    setMemes(prev => [newMeme, ...prev]);
+  };
+
+  const handleSelectMeme = (meme: Meme) => {
+    setImage(meme.imageSrc);
+    setTopText(meme.topText);
+    setBottomText(meme.bottomText);
+  };
+
+  const handleDeleteMeme = (id: string) => {
+    setMemes(prev => prev.filter(m => m.id !== id));
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 
+                    dark:from-zinc-950 dark:via-zinc-900 dark:to-purple-950">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* Header */}
+        <header className="text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-purple-600 to-pink-600 
+                         bg-clip-text text-transparent mb-2">
+            🎭 AI Meme Generator
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-zinc-600 dark:text-zinc-400">
+            Загрузи фото → AI придумает текст → Стань легендой
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        </header>
+
+        <div className="space-y-8">
+          {/* Upload Section */}
+          {!image ? (
+            <ImageUpload onImageSelect={handleImageSelect} />
+          ) : (
+            <div className="space-y-6">
+              {/* AI Prompt */}
+              <AIPrompt onGenerate={handleGenerate} isLoading={isLoading} />
+
+              {/* Error Message */}
+              {imageError && (
+                <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-xl text-red-700 dark:text-red-300">
+                  ⚠️ {imageError}
+                </div>
+              )}
+
+              {/* Meme Preview */}
+              <MemePreview
+                imageSrc={image}
+                topText={topText}
+                bottomText={bottomText}
+                onTextChange={handleTextChange}
+                onImageError={() => setImageError("Изображение не загрузилось")}
+              />
+              
+              {/* Action Buttons */}
+              <div className="flex gap-4">
+                <button
+                  onClick={handleSaveMeme}
+                  className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-pink-600 
+                           text-white font-semibold rounded-2xl text-lg
+                           hover:from-purple-700 hover:to-pink-700
+                           transition-all duration-300 shadow-lg hover:shadow-xl"
+                >
+                  💾 Сохранить в галерею
+                </button>
+                <button
+                  onClick={() => setImage(null)}
+                  className="px-8 py-4 bg-zinc-200 dark:bg-zinc-800 
+                           text-zinc-700 dark:text-zinc-300 font-semibold rounded-2xl
+                           hover:bg-zinc-300 dark:hover:bg-zinc-700
+                           transition-all duration-300"
+                >
+                  🔄 Новое фото
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Gallery Section */}
+          <section className="border-t border-zinc-200 dark:border-zinc-800 pt-8">
+            <h2 className="text-2xl font-bold text-zinc-800 dark:text-zinc-200 mb-4">
+              📚 Твоя галерея
+            </h2>
+            <MemeGallery
+              memes={memes}
+              onSelect={handleSelectMeme}
+              onDelete={handleDeleteMeme}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </section>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
