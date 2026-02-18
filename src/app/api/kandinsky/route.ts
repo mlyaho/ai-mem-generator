@@ -1,70 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/app/api/auth/[...nextauth]/route';
-import { rateLimit } from '@/lib/rateLimit';
+import { withAuthAndRateLimit } from '@/lib/safeHandler';
+import { aiGenerationValidator, validateRequest } from '@/lib/validators';
 
 /**
  * API endpoint для генерации изображений через Kandinsky
- * Скрывает API-ключ на сервере
- * 
- * 🔒 БЕЗОПАСНОСТЬ:
- * - Требуется авторизация
- * - Rate limiting: 10 запросов в минуту
- * - Валидация Content-Type
- * - Валидация входных данных
+ * 🔒 Безопасность: с помощью createSafeHandler
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuthAndRateLimit(async (request: NextRequest) => {
   try {
-    // 🔒 Проверка авторизации
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Требуется авторизация" },
-        { status: 401 }
-      );
-    }
-
-    // 🔒 Rate limiting
-    const rateLimitResponse = rateLimit(request, "ai");
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
-
-    // 🔒 Content-Type валидация
-    const contentType = request.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
-      return NextResponse.json(
-        { error: "Content-Type должен быть application/json" },
-        { status: 415 }
-      );
-    }
-
     const body = await request.json();
-    const { prompt, width = 512, height = 512 } = body;
-
-    // 🔒 Валидация входных данных
-    if (!prompt || typeof prompt !== 'string') {
+    
+    // 🔒 Валидация данных
+    const validation = validateRequest(body, aiGenerationValidator);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Prompt обязателен" },
+        { error: validation.error },
         { status: 400 }
       );
     }
 
-    if (prompt.length > 1000) {
-      return NextResponse.json(
-        { error: "Prompt слишком длинный (макс. 1000 символов)" },
-        { status: 400 }
-      );
-    }
-
-    // 🔒 Валидация размеров
-    const validDimensions = [256, 512, 768, 1024];
-    if (!validDimensions.includes(width) || !validDimensions.includes(height)) {
-      return NextResponse.json(
-        { error: "Некорректные размеры изображения (256, 512, 768, 1024)" },
-        { status: 400 }
-      );
-    }
-
+    const { prompt, width = 512, height = 512 } = validation.data!;
     const apiKey = process.env.KANDINSKY_API_KEY;
 
     if (!apiKey) {
@@ -140,4 +95,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, 'ai');

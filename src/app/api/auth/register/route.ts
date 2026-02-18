@@ -1,12 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { registerSchema } from "@/lib/validators";
-import { rateLimit } from "@/lib/rateLimit";
+import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
+import { prisma } from '@/lib/prisma';
+import { rateLimit } from '@/lib/rateLimit';
+import { registerValidator, validateRequest } from '@/lib/validators';
 
+/**
+ * API endpoint для регистрации пользователя
+ * 🔒 Безопасность: ручная с использованием абстракций
+ */
 export async function POST(req: NextRequest) {
-  // 🔒 Rate limiting для защиты от brute-force
-  const rateLimitResponse = rateLimit(req, "auth");
+  // 🔒 Rate limiting
+  const rateLimitResponse = rateLimit(req, 'auth');
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
@@ -15,7 +19,7 @@ export async function POST(req: NextRequest) {
   const contentType = req.headers.get('content-type');
   if (!contentType?.includes('application/json')) {
     return NextResponse.json(
-      { error: "Content-Type должен быть application/json" },
+      { error: 'Content-Type должен быть application/json' },
       { status: 415 }
     );
   }
@@ -23,48 +27,46 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
-    // Валидация входных данных
-    const validation = registerSchema.safeParse(body);
-    
+    // 🔒 Валидация данных
+    const validation = validateRequest(body, registerValidator);
     if (!validation.success) {
-      const errors = validation.error.issues.map(e => e.message).join("; ");
       return NextResponse.json(
-        { error: errors },
+        { error: validation.error },
         { status: 400 }
       );
     }
 
-    const { email, password, name } = validation.data;
+    const { email, password, name } = validation.data!;
 
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email!.toLowerCase() },
     });
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "Пользователь с таким email уже существует" },
+        { error: 'Пользователь с таким email уже существует' },
         { status: 400 }
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password!, 12);
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: email!.toLowerCase(),
         passwordHash,
-        name: name || email.split("@")[0],
+        name: name || email!.split('@')[0],
       },
     });
 
     return NextResponse.json(
-      { message: "Пользователь успешно создан", userId: user.id },
+      { message: 'Пользователь успешно создан', userId: user.id },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error('Registration error:', error);
     return NextResponse.json(
-      { error: "Ошибка при регистрации" },
+      { error: 'Ошибка при регистрации' },
       { status: 500 }
     );
   }

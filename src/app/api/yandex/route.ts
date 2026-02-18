@@ -1,61 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/app/api/auth/[...nextauth]/route';
-import { rateLimit } from '@/lib/rateLimit';
+import { withAuthAndRateLimit } from '@/lib/safeHandler';
+import { promptValidator, validateRequest } from '@/lib/validators';
 
 /**
  * API endpoint для генерации текста через YandexGPT
- * Скрывает API-ключи на сервере
- * 
- * 🔒 БЕЗОПАСНОСТЬ:
- * - Требуется авторизация
- * - Rate limiting: 10 запросов в минуту
- * - Валидация Content-Type
- * - Валидация входных данных
+ * 🔒 Безопасность: с помощью createSafeHandler
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuthAndRateLimit(async (request: NextRequest) => {
   try {
-    // 🔒 Проверка авторизации
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Требуется авторизация" },
-        { status: 401 }
-      );
-    }
-
-    // 🔒 Rate limiting
-    const rateLimitResponse = rateLimit(request, "ai");
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
-
-    // 🔒 Content-Type валидация
-    const contentType = request.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
-      return NextResponse.json(
-        { error: "Content-Type должен быть application/json" },
-        { status: 415 }
-      );
-    }
-
     const body = await request.json();
-    const { prompt } = body;
-
-    // 🔒 Валидация входных данных
-    if (!prompt || typeof prompt !== 'string') {
+    
+    // 🔒 Валидация данных
+    const validation = validateRequest(body, promptValidator);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Prompt обязателен" },
+        { error: validation.error },
         { status: 400 }
       );
     }
 
-    if (prompt.length > 2000) {
-      return NextResponse.json(
-        { error: "Prompt слишком длинный (макс. 2000 символов)" },
-        { status: 400 }
-      );
-    }
-
+    const { prompt } = validation.data!;
     const apiKey = process.env.YANDEX_API_KEY;
     const folderId = process.env.YANDEX_FOLDER_ID;
 
@@ -111,4 +75,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, 'ai');

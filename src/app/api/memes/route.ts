@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { memeSchema } from "@/lib/validators";
-import { rateLimit } from "@/lib/rateLimit";
+import { createSafeHandler, withAuthAndRateLimit } from "@/lib/safeHandler";
+import { memeValidator, visibilityValidator, validateRequest } from "@/lib/validators";
 
 // GET - получение мемов
 export async function GET(req: NextRequest) {
@@ -28,12 +28,6 @@ export async function GET(req: NextRequest) {
     } else if (isPublic !== 'true') {
       // Если userId не указан и не явно public - только публичные
       where.isPublic = true;
-    }
-
-    // 🔒 Rate limiting
-    const rateLimitResponse = rateLimit(req, "api");
-    if (rateLimitResponse) {
-      return rateLimitResponse;
     }
 
     const take = 20;
@@ -72,123 +66,77 @@ export async function GET(req: NextRequest) {
 }
 
 // POST - создание мема
-export async function POST(req: NextRequest) {
-  // Rate limiting
-  const rateLimitResponse = rateLimit(req, "api");
-  if (rateLimitResponse) {
-    return rateLimitResponse;
+export const POST = withAuthAndRateLimit(async (req: NextRequest) => {
+  const body = await req.json();
+  
+  // 🔒 Валидация данных
+  const validation = validateRequest(body, memeValidator);
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: validation.error },
+      { status: 400 }
+    );
   }
 
-  try {
-    const session = await auth();
+  const session = await auth();
+  const { imageUrl, topText, bottomText, isPublic } = validation.data!;
 
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Требуется авторизация" },
-        { status: 401 }
-      );
-    }
-
-    const body = await req.json();
-    
-    // Валидация данных
-    const validation = memeSchema.safeParse(body);
-    
-    if (!validation.success) {
-      const errors = validation.error.issues.map(e => e.message).join("; ");
-      return NextResponse.json(
-        { error: errors },
-        { status: 400 }
-      );
-    }
-
-    const { imageUrl, topText, bottomText, isPublic } = validation.data;
-
-    const meme = await prisma.meme.create({
-      data: {
-        userId: session.user.id,
-        imageUrl,
-        topText: topText || "",
-        bottomText: bottomText || "",
-        isPublic,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
+  const meme = await prisma.meme.create({
+    data: {
+      userId: session?.user?.id || '',
+      imageUrl,
+      topText: topText || "",
+      bottomText: bottomText || "",
+      isPublic,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
         },
       },
-    });
+    },
+  });
 
-    return NextResponse.json(meme, { status: 201 });
-  } catch (error) {
-    console.error("Create meme error:", error);
-    return NextResponse.json(
-      { error: "Ошибка при создании мема" },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json(meme, { status: 201 });
+}, 'api');
 
 // DELETE - удаление мема
-export async function DELETE(req: NextRequest) {
-  // Rate limiting
-  const rateLimitResponse = rateLimit(req, "api");
-  if (rateLimitResponse) {
-    return rateLimitResponse;
-  }
+export const DELETE = withAuthAndRateLimit(async (req: NextRequest) => {
+  const session = await auth();
+  const { searchParams } = new URL(req.url);
+  const memeId = searchParams.get("id");
 
-  try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Требуется авторизация" },
-        { status: 401 }
-      );
-    }
-
-    const { searchParams } = new URL(req.url);
-    const memeId = searchParams.get("id");
-
-    if (!memeId) {
-      return NextResponse.json(
-        { error: "ID мема обязателен" },
-        { status: 400 }
-      );
-    }
-
-    const meme = await prisma.meme.findUnique({
-      where: { id: memeId },
-    });
-
-    if (!meme) {
-      return NextResponse.json(
-        { error: "Мем не найден" },
-        { status: 404 }
-      );
-    }
-
-    if (meme.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: "Нет прав на удаление этого мема" },
-        { status: 403 }
-      );
-    }
-
-    await prisma.meme.delete({
-      where: { id: memeId },
-    });
-
-    return NextResponse.json({ message: "Мем удален" });
-  } catch (error) {
-    console.error("Delete meme error:", error);
+  if (!memeId) {
     return NextResponse.json(
-      { error: "Ошибка при удалении мема" },
-      { status: 500 }
+      { error: "ID мема обязателен" },
+      { status: 400 }
     );
   }
-}
+
+  const meme = await prisma.meme.findUnique({
+    where: { id: memeId },
+  });
+
+  if (!meme) {
+    return NextResponse.json(
+      { error: "Мем не найден" },
+      { status: 404 }
+    );
+  }
+
+  if (meme.userId !== session!.user!.id) {
+    return NextResponse.json(
+      { error: "Нет прав на удаление этого мема" },
+      { status: 403 }
+    );
+  }
+
+  await prisma.meme.delete({
+    where: { id: memeId },
+  });
+
+  return NextResponse.json({ message: "Мем удален" });
+}, 'api');
