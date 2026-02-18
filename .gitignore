@@ -44,3 +44,7 @@ next-env.d.ts
 
 # prompts
 /prompts
+
+# prisma
+prisma/dev.db
+prisma/*.db
