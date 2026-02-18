@@ -5,7 +5,10 @@ import ImageUpload from "@/components/ImageUpload";
 import AIPrompt from "@/components/AIPrompt";
 import MemePreview from "@/components/MemePreview";
 import MemeGallery from "@/components/MemeGallery";
-import { pollinationsService } from "@/services";
+import { apiFactory, pollinationsService } from "@/services";
+
+// Инициализация сервисов
+apiFactory.register("pollinations", pollinationsService);
 
 interface Meme {
   id: string;
@@ -50,19 +53,22 @@ export default function Home() {
   const handleGenerate = async (prompt: string) => {
     setIsLoading(true);
     setImageError(null);
-    
+
     try {
-      const result = await pollinationsService.generateMeme(prompt);
-      
-      setImage(result.imageUrl);
-      setGeneratedImage(result.imageUrl);
+      const service = apiFactory.getService();
+      const result = await service.generateMeme(prompt);
+
+      if (result.imageUrl) {
+        setImage(result.imageUrl);
+        setGeneratedImage(result.imageUrl);
+      }
       setTopText(result.topText);
       setBottomText(result.bottomText);
     } catch (error) {
       console.error("AI generation error:", error);
-      setImageError("Не удалось сгенерировать изображение");
+      setImageError("Не удалось сгенерировать мем");
     }
-    
+
     setIsLoading(false);
   };
 
@@ -73,7 +79,7 @@ export default function Home() {
 
   const handleSaveMeme = () => {
     if (!image) return;
-    
+
     const newMeme: Meme = {
       id: Date.now().toString(),
       imageSrc: image,
@@ -81,8 +87,8 @@ export default function Home() {
       bottomText,
       createdAt: Date.now(),
     };
-    
-    setMemes(prev => [newMeme, ...prev]);
+
+    setMemes((prev) => [newMeme, ...prev]);
   };
 
   const handleSelectMeme = (meme: Meme) => {
@@ -92,7 +98,7 @@ export default function Home() {
   };
 
   const handleDeleteMeme = (id: string) => {
-    setMemes(prev => prev.filter(m => m.id !== id));
+    setMemes((prev) => prev.filter((m) => m.id !== id));
   };
 
   return (
@@ -134,7 +140,7 @@ export default function Home() {
                 onTextChange={handleTextChange}
                 onImageError={() => setImageError("Изображение не загрузилось")}
               />
-              
+
               {/* Action Buttons */}
               <div className="flex gap-4">
                 <button
