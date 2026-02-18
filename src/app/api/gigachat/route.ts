@@ -1,13 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/app/api/auth/[...nextauth]/route';
+import { rateLimit } from '@/lib/rateLimit';
 
 /**
  * API endpoint для генерации текста через GigaChat
  * Скрывает клиентские ключи на сервере
+ * 
+ * 🔒 БЕЗОПАСНОСТЬ:
+ * - Требуется авторизация
+ * - Rate limiting: 10 запросов в минуту
+ * - Валидация Content-Type
+ * - Валидация входных данных
  */
 export async function POST(request: NextRequest) {
   try {
+    // 🔒 Проверка авторизации
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Требуется авторизация" },
+        { status: 401 }
+      );
+    }
+
+    // 🔒 Rate limiting
+    const rateLimitResponse = rateLimit(request, "ai");
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    // 🔒 Content-Type валидация
+    const contentType = request.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      return NextResponse.json(
+        { error: "Content-Type должен быть application/json" },
+        { status: 415 }
+      );
+    }
+
     const body = await request.json();
     const { prompt } = body;
+
+    // 🔒 Валидация входных данных
+    if (!prompt || typeof prompt !== 'string') {
+      return NextResponse.json(
+        { error: "Prompt обязателен" },
+        { status: 400 }
+      );
+    }
+
+    if (prompt.length > 2000) {
+      return NextResponse.json(
+        { error: "Prompt слишком длинный (макс. 2000 символов)" },
+        { status: 400 }
+      );
+    }
 
     const clientId = process.env.GIGACHAT_CLIENT_ID;
     const clientSecret = process.env.GIGACHAT_CLIENT_SECRET;
@@ -31,52 +78,46 @@ export async function POST(request: NextRequest) {
 
     if (!authResponse.ok) {
       return NextResponse.json(
-        { error: 'GigaChat auth failed' },
-        { status: authResponse.status }
+        { error: 'GigaChat auth error' },
+        { status: 503 }
       );
     }
 
     const authData = await authResponse.json();
-    const token = authData.access_token;
+    const accessToken = authData.access_token;
 
-    // Запрос к GigaChat
-    const chatResponse = await fetch('https://gigachat.devices.sberbank.ru/api/v1/chat/completions', {
+    // Генерация текста
+    const generateResponse = await fetch('https://gigachat.devices.sberbank.ru/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         model: 'GigaChat',
-        messages: [
-          {
-            role: 'system',
-            content: 'Придумай ОЧЕНЬ смешную подпись для мема. Верни ТОЛЬКО 2 строки: первая строка - текст СВЕРХУ, вторая строка - текст СНИЗУ. Без кавычек, без объяснений. Язык: русский.',
-          },
-          {
-            role: 'user',
-            content: `Тема мема: ${prompt}`,
-          },
-        ],
-        temperature: 0.8,
-        max_tokens: 100,
+        messages: [{
+          role: 'user',
+          content: `Придумай смешной текст для мема на тему: ${prompt}. Верни только текст для верхней и нижней строки через запятую.`,
+        }],
       }),
     });
 
-    if (!chatResponse.ok) {
+    if (!generateResponse.ok) {
       return NextResponse.json(
         { error: 'GigaChat API error' },
-        { status: chatResponse.status }
+        { status: generateResponse.status }
       );
     }
 
-    const data = await chatResponse.json();
-    const text = data.choices?.[0]?.message?.content || '';
-    const lines = text.trim().split('\n').filter((l: string) => l.trim());
+    const generateData = await generateResponse.json();
+    const content = generateData.choices?.[0]?.message?.content || '';
+
+    // Парсинг ответа (верхняя, нижняя строки)
+    const [topText, bottomText] = content.split(',').map((s: string) => s.trim());
 
     return NextResponse.json({
-      topText: lines[0]?.replace(/["']/g, '').trim() || 'КОГДА ТЫ',
-      bottomText: lines[1]?.replace(/["']/g, '').trim() || 'ПРОГРАММИСТ',
+      topText: topText || '',
+      bottomText: bottomText || '',
     });
   } catch (error) {
     console.error('GigaChat API error:', error);

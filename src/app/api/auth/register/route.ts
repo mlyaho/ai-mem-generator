@@ -5,10 +5,19 @@ import { registerSchema } from "@/lib/validators";
 import { rateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
-  // Rate limiting для защиты от brute-force
+  // 🔒 Rate limiting для защиты от brute-force
   const rateLimitResponse = rateLimit(req, "auth");
   if (rateLimitResponse) {
     return rateLimitResponse;
+  }
+
+  // 🔒 Content-Type валидация
+  const contentType = req.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    return NextResponse.json(
+      { error: "Content-Type должен быть application/json" },
+      { status: 415 }
+    );
   }
 
   try {

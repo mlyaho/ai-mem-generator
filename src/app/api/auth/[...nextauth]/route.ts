@@ -134,6 +134,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
+  // 🔒 trustHost: true требуется для работы с OAuth
+  // В production использовать HTTPS и правильные NEXTAUTH_URL
   trustHost: true,
 });
 

@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rateLimit";
 // GET - получение мемов
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
     const searchParams = req.nextUrl.searchParams;
     const userId = searchParams.get("userId");
     const isPublic = searchParams.get("isPublic");
@@ -14,12 +15,25 @@ export async function GET(req: NextRequest) {
 
     let where: any = {};
 
+    // 🔒 Защита от enumeration атак
     if (userId) {
-      where.userId = userId;
+      // Если запрос к своим мемам - показываем все
+      if (session?.user?.id === userId) {
+        where.userId = userId;
+      } else {
+        // Если запрос к чужим - только публичные
+        where.userId = userId;
+        where.isPublic = true;
+      }
+    } else if (isPublic !== 'true') {
+      // Если userId не указан и не явно public - только публичные
+      where.isPublic = true;
     }
 
-    if (isPublic !== null) {
-      where.isPublic = isPublic === "true";
+    // 🔒 Rate limiting
+    const rateLimitResponse = rateLimit(req, "api");
+    if (rateLimitResponse) {
+      return rateLimitResponse;
     }
 
     const take = 20;
