@@ -8,16 +8,23 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String?
-  name          String?
-  image         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  memes         Meme[]
-  accounts      Account[]
-  sessions      Session[]
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String?
+  name            String?
+  image           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  memes           Meme[]
+  accounts        Account[]
+  sessions        Session[]
+  subscription    Subscription?
+  creditBalance   CreditBalance?
+  referrals       Referral[] @relation("Referrals")
+  referredBy      Referral? @relation("Referred")
+  payments        Payment[]
+  
+  @@index([email])
 }
 
 model Meme {
@@ -71,4 +78,98 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// ============================================
+// 💰 Monetization Models
+// ============================================
+
+model Subscription {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan              String   // "free" | "premium" | "pro"
+  status            String   // "active" | "cancelled" | "expired" | "trialing"
+  currentPeriodEnd  DateTime?
+  cancelAtPeriodEnd Boolean  @default(false)
+  cancelledAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([plan])
+  @@index([status])
+}
+
+model CreditBalance {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance    Int      @default(0)
+  lifetime   Int      @default(0)  // Всего заработано за всё время
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Int      // Положительный = начисление, отрицательный = списание
+  type        String   // "purchase" | "generation" | "referral" | "bonus" | "refund"
+  description String
+  balance     Int      // Баланс после операции
+  createdAt   DateTime @default(now())
+  
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Referral {
+  id           String   @id @default(cuid())
+  referrerId   String
+  refereeId    String   @unique
+  referrer     User     @relation("Referrals", fields: [referrerId], references: [id])
+  referee      User     @relation("Referred", fields: [refereeId], references: [id])
+  creditsEarned Int    @default(0)
+  createdAt    DateTime @default(now())
+  
+  @@index([referrerId])
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount          Int      // В копейках/центах
+  currency        String   // "RUB" | "USD" | "EUR"
+  status          String   // "pending" | "succeeded" | "failed" | "refunded"
+  provider        String   // "yookassa" | "stripe" | "cloudpayments"
+  providerPaymentId String?
+  description     String
+  metadata        String?  // JSON строка с дополнительными данными
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([provider])
+  @@index([createdAt])
+}
+
+model PromoCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  type        String   // "discount" | "credits"
+  value       Int      // Процент скидки или количество кредитов
+  maxUses     Int      @default(1)
+  usedCount   Int      @default(0)
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  @@index([code])
+  @@index([isActive])
 }

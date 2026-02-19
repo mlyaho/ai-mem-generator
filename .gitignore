@@ -44,6 +44,7 @@ next-env.d.ts
 
 # prompts
 /prompts
+/export-prompts
 
 # prisma
 prisma/dev.db
