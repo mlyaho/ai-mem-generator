@@ -2,9 +2,11 @@
 
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import Image from "next/image";
+import GallerySkeleton from "@/components/GallerySkeleton";
 
 interface Meme {
   id: string;
@@ -85,6 +87,7 @@ export default function Profile() {
     }
   };
 
+  // Заглушка для загрузки
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50
@@ -122,10 +125,12 @@ export default function Profile() {
             {session?.user && (
               <div className="flex items-center gap-3">
                 {session.user.image && (
-                  <img
+                  <Image
                     src={session.user.image}
                     alt={session.user.name || "User"}
-                    className="w-10 h-10 rounded-full"
+                    width={40}
+                    height={40}
+                    className="rounded-full"
                   />
                 )}
                 <span className="text-zinc-700 dark:text-zinc-300 font-medium">
@@ -148,10 +153,13 @@ export default function Profile() {
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-6 mb-8">
           <div className="flex items-center gap-6">
             {session?.user?.image ? (
-              <img
+              <Image
                 src={session.user.image}
                 alt={session.user.name || "User"}
-                className="w-20 h-20 rounded-full"
+                width={80}
+                height={80}
+                className="rounded-full"
+                priority
               />
             ) : (
               <div className="w-20 h-20 rounded-full bg-gradient-to-r from-purple-600 to-pink-600
@@ -192,9 +200,7 @@ export default function Profile() {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
-              Загрузка...
-            </div>
+            <GallerySkeleton />
           ) : memes.length === 0 ? (
             <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
               <p className="text-lg">Галерея пуста</p>
@@ -207,17 +213,21 @@ export default function Profile() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {memes.map((meme) => (
+              {memes.map((meme, index) => (
                 <div
                   key={meme.id}
                   className="group relative aspect-square rounded-xl overflow-hidden
                              bg-zinc-100 dark:bg-zinc-800 cursor-pointer
                              hover:ring-2 hover:ring-purple-500 transition-all"
                 >
-                  <img
+                  <Image
                     src={meme.imageUrl}
                     alt="Meme"
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    className="object-cover"
+                    loading={index < 8 ? "eager" : "lazy"}
+                    priority={index < 8}
                   />
 
                   <div className="absolute top-2 left-2">

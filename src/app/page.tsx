@@ -45,8 +45,12 @@ export default function Home() {
     }
   }, []);
 
+  // Debounced localStorage save - сохраняем только через 500ms после изменений
   useEffect(() => {
-    localStorage.setItem("meme-gallery", JSON.stringify(memes));
+    const handler = setTimeout(() => {
+      localStorage.setItem("meme-gallery", JSON.stringify(memes));
+    }, 500);
+    return () => clearTimeout(handler);
   }, [memes]);
 
   const handleImageSelect = useCallback((file: File, preview: string) => {

@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 interface Meme {
   id: string;
   imageSrc: string;
@@ -26,18 +28,22 @@ export default function MemeGallery({ memes, onSelect, onDelete }: MemeGalleryPr
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      {memes.map((meme) => (
+      {memes.map((meme, index) => (
         <div
           key={meme.id}
-          className="group relative aspect-square rounded-xl overflow-hidden 
+          className="group relative aspect-square rounded-xl overflow-hidden
                      bg-zinc-100 dark:bg-zinc-800 cursor-pointer
                      hover:ring-2 hover:ring-purple-500 transition-all"
           onClick={() => onSelect(meme)}
         >
-          <img
+          <Image
             src={meme.imageSrc}
             alt="Meme"
-            className="w-full h-full object-cover"
+            fill
+            sizes="(max-width: 768px) 50vw, 33vw"
+            className="object-cover"
+            loading={index < 4 ? "eager" : "lazy"}
+            priority={index < 4}
           />
           
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent 

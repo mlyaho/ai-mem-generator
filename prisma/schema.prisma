@@ -33,6 +33,8 @@ model Meme {
 
   @@index([userId])
   @@index([isPublic])
+  @@index([isPublic, createdAt])  // Composite index для ленты
+  @@index([userId, createdAt])    // Composite index для профиля
 }
 
 model Account {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 
 interface MemePreviewProps {
   imageSrc: string;
@@ -39,15 +40,20 @@ export default function MemePreview({
     <div className="w-full space-y-4">
       <div className="relative inline-block max-w-full">
         <canvas ref={canvasRef} className="hidden" />
-        
+
         <div className="relative rounded-2xl overflow-hidden shadow-2xl">
           {imageLoaded ? (
-            <img
-              src={imageSrc}
-              alt="Meme base"
-              onError={handleImageError}
-              className="max-w-full h-auto max-h-[500px] object-contain bg-zinc-100 dark:bg-zinc-800"
-            />
+            <div className="relative w-full max-w-[500px] h-auto aspect-square">
+              <Image
+                src={imageSrc}
+                alt="Meme base"
+                fill
+                sizes="(max-width: 500px) 100vw, 500px"
+                className="object-contain bg-zinc-100 dark:bg-zinc-800"
+                onError={handleImageError}
+                priority
+              />
+            </div>
           ) : (
             <div className="w-full h-64 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700">
               <p className="text-zinc-500 dark:text-zinc-400">Изображение не загрузилось</p>
