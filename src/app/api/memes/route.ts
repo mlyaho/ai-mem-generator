@@ -13,8 +13,11 @@ export async function GET(req: NextRequest) {
     const isPublic = searchParams.get("isPublic");
     const cursor = searchParams.get("cursor");
 
+    // Используем userId из сессии, если он не указан или совпадает с текущим пользователем
+    const targetUserId = userId || session?.user?.id;
+
     const memes = await memeService.getMemes(
-      { userId: userId || undefined, isPublic: isPublic === 'true', cursor },
+      { userId: targetUserId, isPublic: isPublic === 'true', cursor },
       session?.user?.id
     );
 
@@ -31,6 +34,7 @@ export async function GET(req: NextRequest) {
 // POST - создание мема
 export const POST = withAuthAndRateLimit(async (req: NextRequest) => {
   const body = await req.json();
+  const session = await auth();
 
   // 🔒 Валидация данных
   const validation = validateRequest(body, memeValidator);
@@ -41,7 +45,6 @@ export const POST = withAuthAndRateLimit(async (req: NextRequest) => {
     );
   }
 
-  const session = await auth();
   const meme = await memeService.createMeme({
     userId: session?.user?.id || '',
     ...validation.data!,

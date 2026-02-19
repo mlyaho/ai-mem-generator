@@ -73,28 +73,32 @@ export const registerValidator = emailValidator.merge(passwordValidator).extend(
 export const imageUrlValidator = z
   .string()
   .min(1, 'Изображение обязательно')
-  .url('Некорректный URL')
   .refine(
     (url) => {
+      // Разрешаем Data URL (для загруженных изображений)
+      if (url.startsWith('data:image/')) {
+        return true;
+      }
+
       try {
         const parsed = new URL(url);
-        
+
         // Только http/https
         if (!['https:', 'http:'].includes(parsed.protocol)) {
           return false;
         }
-        
-        // Блокировка опасных протоколов
-        if (url.toLowerCase().match(/^(javascript:|data:|vbscript:|file:)/)) {
+
+        // Блокировка опасных протоколов (кроме data:)
+        if (url.toLowerCase().match(/^(javascript:|vbscript:|file:)/)) {
           return false;
         }
-        
+
         // Блокировка внутренних IP
         const internalIpPattern = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|localhost)/i;
         if (internalIpPattern.test(parsed.hostname)) {
           return false;
         }
-        
+
         return true;
       } catch {
         return false;

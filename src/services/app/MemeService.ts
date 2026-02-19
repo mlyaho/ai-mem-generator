@@ -34,9 +34,11 @@ export class MemeService {
 
     // 🔒 Защита от enumeration атак
     if (userId) {
-      // Если запрос к своим мемам — показываем все
-      if (currentUserId === userId) {
-        return memeRepository.findMany({ userId, isPublic, cursor: filters.cursor, take: filters.take });
+      // Если запрос к своим мемам — показываем ВСЕ (и приватные, и публичные)
+      // Сравниваем строки, приводя к одному типу
+      if (currentUserId && String(currentUserId) === String(userId)) {
+        // Для своих мемов игнорируем isPublic фильтр
+        return memeRepository.findMany({ userId, cursor: filters.cursor, take: filters.take });
       }
       // Если запрос к чужим — только публичные
       return memeRepository.findMany({ userId, isPublic: true, cursor: filters.cursor, take: filters.take });

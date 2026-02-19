@@ -20,6 +20,7 @@ export default function MemePreview({
 }: MemePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [imageLoaded, setImageLoaded] = useState(true);
+  const isDataUrl = imageSrc?.startsWith("data:");
 
   const handleExport = () => {
     const canvas = canvasRef.current;
@@ -43,17 +44,28 @@ export default function MemePreview({
 
         <div className="relative rounded-2xl overflow-hidden shadow-2xl">
           {imageLoaded ? (
-            <div className="relative w-full max-w-[500px] h-auto aspect-square">
-              <Image
+            isDataUrl ? (
+              // Для Data URL используем обычный img
+              <img
                 src={imageSrc}
                 alt="Meme base"
-                fill
-                sizes="(max-width: 500px) 100vw, 500px"
-                className="object-contain bg-zinc-100 dark:bg-zinc-800"
+                className="w-full max-w-[500px] h-auto object-contain bg-zinc-100 dark:bg-zinc-800"
                 onError={handleImageError}
-                priority
               />
-            </div>
+            ) : (
+              // Для внешних URL используем Next.js Image
+              <div className="relative w-full max-w-[500px] h-auto aspect-square">
+                <Image
+                  src={imageSrc}
+                  alt="Meme base"
+                  fill
+                  sizes="(max-width: 500px) 100vw, 500px"
+                  className="object-contain bg-zinc-100 dark:bg-zinc-800"
+                  onError={handleImageError}
+                  priority
+                />
+              </div>
+            )
           ) : (
             <div className="w-full h-64 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700">
               <p className="text-zinc-500 dark:text-zinc-400">Изображение не загрузилось</p>
