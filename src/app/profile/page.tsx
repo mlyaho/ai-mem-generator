@@ -2,7 +2,7 @@
 
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import Image from "next/image";
@@ -188,7 +188,7 @@ export default function Profile() {
             <div className="flex gap-2">
               <select
                 value={isPublicFilter}
-                onChange={(e) => setIsPublicFilter(e.target.value as any)}
+                onChange={(e) => setIsPublicFilter(e.target.value as "all" | "public" | "private")}
                 className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700
                          rounded-xl text-zinc-700 dark:text-zinc-300 focus:ring-2 focus:ring-purple-500"
               >

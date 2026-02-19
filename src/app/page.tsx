@@ -29,21 +29,22 @@ export default function Home() {
   const [topText, setTopText] = useState("");
   const [bottomText, setBottomText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [memes, setMemes] = useState<Meme[]>([]);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
-  const [isPublic, setIsPublic] = useState(true);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("meme-gallery");
-    if (saved) {
-      try {
-        setMemes(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load memes");
+  const [memes, setMemes] = useState<Meme[]>(() => {
+    // Lazy initialization из localStorage
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("meme-gallery");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          console.error("Failed to load memes");
+        }
       }
     }
-  }, []);
+    return [];
+  });
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(true);
 
   // Debounced localStorage save - сохраняем только через 500ms после изменений
   useEffect(() => {
@@ -55,7 +56,6 @@ export default function Home() {
 
   const handleImageSelect = useCallback((file: File, preview: string) => {
     setImage(preview);
-    setGeneratedImage(null);
     setImageError(null);
     setTopText("");
     setBottomText("");
@@ -71,7 +71,6 @@ export default function Home() {
 
       if (result.imageUrl) {
         setImage(result.imageUrl);
-        setGeneratedImage(result.imageUrl);
       }
       setTopText(result.topText);
       setBottomText(result.bottomText);

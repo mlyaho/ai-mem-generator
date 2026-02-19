@@ -46,7 +46,7 @@ export default function SignUp() {
         router.push("/profile");
         router.refresh();
       }
-    } catch (err) {
+    } catch {
       setError("Ошибка при регистрации");
     } finally {
       setIsLoading(false);

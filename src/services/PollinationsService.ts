@@ -95,8 +95,6 @@ export class PollinationsService extends BaseApiService implements IMemeApiServi
    * Генерация полного мема
    */
   async generateMeme(prompt: string): Promise<MemeGenerationResult> {
-    const seed = Math.floor(Math.random() * 1000000);
-
     const [imageUrl, textResponse] = await Promise.all([
       this.generateImage(prompt + ' meme funny', 512, 512),
       this.generateMemeText(),

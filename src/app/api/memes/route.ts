@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { createSafeHandler, withAuthAndRateLimit } from "@/lib/safeHandler";
-import { memeValidator, visibilityValidator, validateRequest } from "@/lib/validators";
+import { withAuthAndRateLimit } from "@/lib/safeHandler";
+import { memeValidator, validateRequest } from "@/lib/validators";
+import type { Prisma } from "@prisma/client";
 
 // GET - получение мемов
 export async function GET(req: NextRequest) {
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
     const isPublic = searchParams.get("isPublic");
     const cursor = searchParams.get("cursor");
 
-    let where: any = {};
+    const where: Prisma.MemeWhereInput = {};
 
     // 🔒 Защита от enumeration атак
     if (userId) {

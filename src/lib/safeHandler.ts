@@ -13,7 +13,7 @@ export type ApiHandler = (
 /**
  * Тип для валидатора тела запроса
  */
-export type BodyValidator<T> = (body: any) => { success: boolean; data?: T; error?: string };
+export type BodyValidator<T> = (body: unknown) => { success: boolean; data?: T; error?: string };
 
 /**
  * Конфигурация безопасного API handler

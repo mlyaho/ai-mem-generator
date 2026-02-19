@@ -5,14 +5,13 @@ import GitHubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { rateLimit } from "@/lib/rateLimit";
-import { NextRequest } from "next/server";
+import type { Adapter } from "next-auth/adapters";
 
 // Хранение неудачных попыток входа в памяти (для production лучше использовать БД/Redis)
 const failedLoginAttempts = new Map<string, { count: number; resetTime: number }>();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma) as any,
+  adapter: PrismaAdapter(prisma) as Adapter,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -29,14 +28,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
         name: { label: "Name", type: "text" },
       },
-      async authorize(credentials, req) {
+      async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Email и пароль обязательны");
         }
 
         const email = credentials.email as string;
         const password = credentials.password as string;
-        const ip = (req as NextRequest)?.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
         const now = Date.now();
         const lockoutTime = 15 * 60 * 1000; // 15 минут
         const maxAttempts = 5;
