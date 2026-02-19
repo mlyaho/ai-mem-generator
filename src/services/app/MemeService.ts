@@ -34,17 +34,26 @@ export class MemeService {
 
     // 🔒 Защита от enumeration атак
     if (userId) {
-      // Если запрос к своим мемам — показываем ВСЕ (и приватные, и публичные)
-      // Сравниваем строки, приводя к одному типу
-      if (currentUserId && String(currentUserId) === String(userId)) {
-        // Для своих мемов игнорируем isPublic фильтр
-        return memeRepository.findMany({ userId, cursor: filters.cursor, take: filters.take });
+      // Проверяем, запрашивает ли пользователь свои мемы
+      const isOwnMemes = currentUserId && String(currentUserId) === String(userId);
+
+      // Если запрошены чужие мемы — только публичные
+      if (!isOwnMemes) {
+        return memeRepository.findMany({ userId, isPublic: true, cursor: filters.cursor, take: filters.take });
       }
-      // Если запрос к чужим — только публичные
-      return memeRepository.findMany({ userId, isPublic: true, cursor: filters.cursor, take: filters.take });
+
+      // Свои мемы:
+      // - Если isPublic передан — фильтруем по нему
+      // - Если isPublic не передан — показываем все (и приватные, и публичные)
+      if (isPublic !== undefined) {
+        return memeRepository.findMany({ userId, isPublic, cursor: filters.cursor, take: filters.take });
+      }
+
+      // isPublic не указан — показываем все мемы пользователя
+      return memeRepository.findMany({ userId, cursor: filters.cursor, take: filters.take });
     }
 
-    // Если userId не указан — только публичные (если явно не указано иное)
+    // Если userId не указан — только публичные (лента)
     if (isPublic !== true) {
       return memeRepository.findMany({ isPublic: true, cursor: filters.cursor, take: filters.take });
     }

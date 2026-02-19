@@ -10,14 +10,19 @@ export async function GET(req: NextRequest) {
     const session = await auth();
     const searchParams = req.nextUrl.searchParams;
     const userId = searchParams.get("userId");
-    const isPublic = searchParams.get("isPublic");
+    const isPublicParam = searchParams.get("isPublic");
     const cursor = searchParams.get("cursor");
 
-    // Используем userId из сессии, если он не указан или совпадает с текущим пользователем
+    // Используем userId из сессии, если он не указан
     const targetUserId = userId || session?.user?.id;
 
+    // Передаём isPublic только если он явно указан в запросе
     const memes = await memeService.getMemes(
-      { userId: targetUserId, isPublic: isPublic === 'true', cursor },
+      {
+        userId: targetUserId,
+        isPublic: isPublicParam === 'true' ? true : (isPublicParam === 'false' ? false : undefined),
+        cursor
+      },
       session?.user?.id
     );
 
