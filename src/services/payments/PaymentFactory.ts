@@ -7,8 +7,9 @@
 import type { IPaymentService } from './IPaymentService';
 import { YooKassaService } from './YooKassaService';
 import { StripeService } from './StripeService';
+import { MockPaymentService } from './mock/MockPaymentService';
 
-export type PaymentProvider = 'yookassa' | 'stripe' | 'cloudpayments';
+export type PaymentProvider = 'yookassa' | 'stripe' | 'cloudpayments' | 'mock';
 
 export interface PaymentFactoryConfig {
   defaultProvider: PaymentProvider;
@@ -20,6 +21,13 @@ export interface PaymentFactoryConfig {
   stripe?: {
     apiKey: string;
     secretKey?: string;
+  };
+  mock?: {
+    simulateSuccess?: boolean;
+    simulateError?: boolean;
+    processingDelay?: number;
+    autoConfirmWebhooks?: boolean;
+    enableLogging?: boolean;
   };
 }
 
@@ -43,6 +51,14 @@ export class PaymentFactory {
       this.providers.set(
         'stripe',
         new StripeService(config.stripe.apiKey, config.stripe.secretKey)
+      );
+    }
+
+    // Mock сервис для тестирования
+    if (config.mock || process.env.NODE_ENV === 'test') {
+      this.providers.set(
+        'mock',
+        new MockPaymentService(config.mock)
       );
     }
   }
@@ -119,7 +135,7 @@ let _factory: PaymentFactory | null = null;
 export function getPaymentFactory(): PaymentFactory {
   if (!_factory) {
     const config: PaymentFactoryConfig = {
-      defaultProvider: (process.env.PAYMENT_PROVIDER as PaymentProvider) || 'yookassa',
+      defaultProvider: (process.env.PAYMENT_PROVIDER as PaymentProvider) || 'mock',
       yookassa: process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_API_KEY ? {
         shopId: process.env.YOOKASSA_SHOP_ID,
         apiKey: process.env.YOOKASSA_API_KEY,
@@ -128,6 +144,14 @@ export function getPaymentFactory(): PaymentFactory {
       stripe: process.env.STRIPE_SECRET_KEY ? {
         apiKey: process.env.STRIPE_SECRET_KEY,
         secretKey: process.env.STRIPE_WEBHOOK_SECRET,
+      } : undefined,
+      // Mock по умолчанию для development/test
+      mock: process.env.NODE_ENV !== 'production' ? {
+        simulateSuccess: process.env.MOCK_PAYMENT_SUCCESS !== 'false',
+        simulateError: process.env.MOCK_PAYMENT_ERROR === 'true',
+        processingDelay: parseInt(process.env.MOCK_PAYMENT_DELAY || '100', 10),
+        autoConfirmWebhooks: process.env.MOCK_AUTO_CONFIRM !== 'false',
+        enableLogging: process.env.MOCK_LOGGING === 'true',
       } : undefined,
     };
 

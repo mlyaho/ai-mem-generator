@@ -22,3 +22,11 @@ export {
   type PaymentFactoryConfig,
   type PaymentProvider,
 } from './PaymentFactory';
+
+// Mock сервисы для тестирования
+export {
+  MockPaymentService,
+  mockPaymentService,
+  type IMockPaymentConfig,
+  type MockPaymentState,
+} from './mock';
