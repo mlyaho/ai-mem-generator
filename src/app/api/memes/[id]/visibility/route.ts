@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
-import { prisma } from "@/lib/prisma";
+import { memeService } from "@/services/app";
 
 export async function PATCH(
   req: NextRequest,
@@ -19,40 +19,17 @@ export async function PATCH(
 
     const { isPublic } = await req.json();
 
-    const meme = await prisma.meme.findUnique({
-      where: { id },
-    });
-
-    if (!meme) {
-      return NextResponse.json(
-        { error: "Мем не найден" },
-        { status: 404 }
-      );
-    }
-
-    if (meme.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: "Нет прав на редактирование этого мема" },
-        { status: 403 }
-      );
-    }
-
-    const updatedMeme = await prisma.meme.update({
-      where: { id },
-      data: { isPublic },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
-        },
-      },
-    });
-
+    const updatedMeme = await memeService.updateVisibility(id, session.user.id, isPublic);
     return NextResponse.json(updatedMeme);
   } catch (error) {
+    if (error instanceof Error) {
+      const status = error.message === 'Мем не найден' ? 404 :
+                     error.message.includes('Нет прав') ? 403 : 500;
+      return NextResponse.json(
+        { error: error.message },
+        { status }
+      );
+    }
     console.error("Update meme visibility error:", error);
     return NextResponse.json(
       { error: "Ошибка при обновлении" },

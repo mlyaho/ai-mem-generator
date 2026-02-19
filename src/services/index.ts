@@ -13,3 +13,6 @@ export { GigaChatService, gigaChatService } from './GigaChatService';
 
 // Базовый класс
 export { BaseApiService, ApiError } from './BaseApiService';
+
+// Сервисы приложения
+export { MemeService, memeService, MemeServiceError } from './app';
